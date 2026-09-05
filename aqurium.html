@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Museum of Us : Aquarium Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Mali:wght@600;700&family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #010614;
+            --primary: #4facfe;
+            --secondary: #00f2fe;
+            --pink-glow: #ff7eb3;
+            --text-glow: 0 0 15px rgba(79, 172, 254, 0.6);
+        }
+        body { margin: 0; padding: 0; background: var(--bg-color); color: white; font-family: 'Prompt', sans-serif; overflow: hidden; height: 100vh; touch-action: none; }
+        
+        #bg-canvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; opacity: 0.6; }
+
+        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10; background: radial-gradient(circle at center, rgba(1, 20, 40, 0.8) 0%, var(--bg-color) 100%); backdrop-filter: blur(5px); }
+        .active { display: flex; animation: fadeIn 0.8s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+        /* --- 1. หน้าตั๋วเข้าชม (ฉีกตั๋ว) --- */
+        .ticket-wrapper { display: flex; align-items: stretch; transition: 0.5s; filter: drop-shadow(0 20px 40px rgba(0,0,0,0.8)); }
+        .ticket-half { background: #fdfbf7; position: relative; transition: transform 1.2s cubic-bezier(0.55, 0.085, 0.68, 0.53), opacity 1s 0.2s; }
+        .ticket-left { padding: 30px; border-radius: 15px 0 0 15px; border-right: 2px dashed #bbb; width: 260px; text-align: center; }
+        .ticket-left::before, .ticket-left::after { content: ''; position: absolute; right: -12px; width: 24px; height: 24px; background: #011428; border-radius: 50%; z-index: 5; }
+        .ticket-left::before { top: -12px; }
+        .ticket-left::after { bottom: -12px; }
+        .ticket-right { padding: 20px 15px; border-radius: 0 15px 15px 0; display: flex; flex-direction: column; align-items: center; justify-content: space-between; color: #333; }
+        .ticket-no { writing-mode: vertical-rl; font-family: 'Prompt'; font-size: 14px; font-weight: 600; color: #ff4757; letter-spacing: 2px; }
+        .barcode { writing-mode: vertical-rl; font-family: monospace; font-size: 28px; font-weight: bold; letter-spacing: -3px; color: #222; opacity: 0.7; }
+        .ticket-wrapper.torn .ticket-left { transform: translateX(-150px) translateY(80px) rotate(-15deg); opacity: 0; }
+        .ticket-wrapper.torn .ticket-right { transform: translateX(150px) translateY(80px) rotate(15deg); opacity: 0; }
+
+        .museum-title { font-family: 'Cinzel', serif; font-size: 28px; letter-spacing: 3px; color: #011a33; margin: 0 0 5px 0; font-weight: 700; }
+        .subtitle { font-size: 11px; font-weight: 600; letter-spacing: 2px; color: #888; margin-bottom: 25px; text-transform: uppercase; }
+        .dots { display: flex; gap: 15px; margin-bottom: 30px; justify-content: center; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #ccc; transition: 0.3s; }
+        .dot.filled { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 10px rgba(79, 172, 254, 0.5); }
+        .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .key { width: 55px; height: 55px; border-radius: 50%; background: #f0f0f0; border: 1px solid #ddd; color: #333; font-size: 22px; font-weight: 400; cursor: pointer; transition: 0.2s; font-family: 'Prompt'; margin: 0 auto; }
+        .key:active { background: var(--primary); color: white; transform: scale(0.9); border-color: var(--primary); }
+
+        /* --- 2. หน้า Arch Door (ประตูใหม่ สวยอลังการขึ้น) --- */
+        .door-container { position: relative; width: 310px; height: 460px; cursor: pointer; }
+        
+        /* ซุ้มประตูเรืองแสง */
+        .arch-door { 
+            width: 100%; height: 100%; 
+            border: 6px solid rgba(0, 242, 254, 0.8); 
+            border-bottom: none;
+            border-radius: 155px 155px 0 0; 
+            position: absolute; overflow: hidden; display: flex; 
+            box-shadow: 0 0 30px rgba(0, 242, 254, 0.5), inset 0 0 30px rgba(0, 242, 254, 0.3); 
+        }
+        
+        /* กระจกประตู */
+        .door-left, .door-right { 
+            width: 50%; height: 100%; 
+            background: linear-gradient(180deg, rgba(0, 242, 254, 0.1) 0%, rgba(1, 15, 30, 0.8) 100%); 
+            backdrop-filter: blur(12px); 
+            transition: transform 3s cubic-bezier(0.5, 0, 0.1, 1); 
+            position: relative; 
+        }
+        .door-left { border-right: 2px solid rgba(0, 242, 254, 0.6); }
+        .door-right { border-left: 2px solid rgba(0, 242, 254, 0.6); }
+        
+        /* ที่จับประตูเรืองแสง */
+        .door-left::before { content: ''; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 4px; height: 70px; background: rgba(0, 242, 254, 0.9); border-radius: 5px; box-shadow: 0 0 15px rgba(0, 242, 254, 1); }
+        .door-right::before { content: ''; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 4px; height: 70px; background: rgba(0, 242, 254, 0.9); border-radius: 5px; box-shadow: 0 0 15px rgba(0, 242, 254, 1); }
+
+        /* ตัวอักษรกะพริบชวนกด */
+        .door-text { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            text-align: center; font-family: 'Cinzel', serif; font-size: 24px; color: white; 
+            text-shadow: 0 0 20px var(--secondary), 0 0 40px var(--secondary); 
+            pointer-events: none; z-index: 5; line-height: 1.5; 
+            animation: pulseGlow 2s infinite;
+        }
+        @keyframes pulseGlow { 0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 50% { opacity: 0.7; transform: translate(-50%, -50%) scale(0.95); } }
+        
+        .door-open .door-left { transform: translateX(-100%); }
+        .door-open .door-right { transform: translateX(100%); }
+        .door-open .door-text { opacity: 0; transition: 0.5s; }
+
+        /* --- 3. หน้า ตู้ปลา & ข้อความบอกรัก --- */
+        #screen-giant-tank { background: transparent; }
+        #tank-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; z-index: 1; }
+        .jellyfish-swarm { position: absolute; filter: drop-shadow(0 0 15px var(--secondary)); animation: swim linear infinite; opacity: 0; }
+        
+        @keyframes swim {
+            0% { transform: translateY(110vh) scale(0.8) rotate(-10deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-20vh) scale(1.2) rotate(10deg); opacity: 0; }
+        }
+
+        /* โซนข้อความ "รักอ้วน" */
+        .love-text-wrapper {
+            position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 15; text-align: center;
+            opacity: 0; /* ซ่อนไว้ก่อน เดี๋ยว JS สั่งให้โชว์ */
+            transition: opacity 2s ease-in-out;
+            pointer-events: none;
+        }
+        
+        /* ใช้ฟอนต์น่ารัก (Mali) ลอยดุ๊กดิ๊ก */
+        .love-text-main {
+            font-family: 'Mali', cursive;
+            font-size: 65px; /* ขนาดใหญ่เบิ้ม */
+            font-weight: 700;
+            color: white;
+            white-space: nowrap;
+            text-shadow: 0 0 15px var(--pink-glow), 0 0 30px var(--pink-glow), 0 0 50px var(--pink-glow);
+            animation: floatLove 4s infinite ease-in-out;
+        }
+        
+        .love-text-sub {
+            font-family: 'Prompt', sans-serif;
+            font-size: 14px;
+            color: rgba(255,255,255,0.8);
+            margin-top: 10px;
+            letter-spacing: 2px;
+            font-weight: 300;
+        }
+        
+        @keyframes floatLove {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(2deg); text-shadow: 0 0 25px var(--pink-glow), 0 0 60px var(--pink-glow); }
+        }
+
+        .tank-overlay { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 20; text-align: center; opacity: 0; animation: fadeIn 2s 4s forwards; pointer-events: auto; }
+        .btn-action { padding: 12px 40px; border-radius: 30px; border: 1px solid var(--primary); background: rgba(0,0,0,0.5); color: white; font-family: 'Prompt'; font-size: 14px; cursor: pointer; transition: 0.3s; letter-spacing: 1px; backdrop-filter: blur(5px); }
+        .btn-action:hover, .btn-action:active { background: var(--primary); color: black; box-shadow: 0 0 20px var(--primary); }
+
+        /* --- 4. หน้าเช็ดกระจกฝ้า --- */
+        .wipe-wrapper { 
+            position: relative; width: 280px; height: 380px; border-radius: 12px; 
+            box-shadow: 0 10px 30px rgba(0, 242, 254, 0.3); overflow: hidden; background: #011428; 
+            border: 2px solid rgba(0, 242, 254, 0.5);
+        }
+        
+        .wipe-content { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1; 
+            background: radial-gradient(circle, #012a4a 0%, #011428 100%);
+            padding: 15px; box-sizing: border-box; /* ปรับลด Padding ให้รูปมีพื้นที่มากขึ้น */
+        }
+
+        /* 📌 แก้ไขส่วนนี้ให้แสดงภาพเต็มๆ ไม่มีครอปออก */
+        .my-photo {
+            max-width: 90%; 
+            height: 240px; /* เพิ่มความสูงให้เหมาะกับรูปแนวตั้ง */
+            object-fit: contain; /* โค้ดนี้บังคับให้รูปแสดงเต็มใบ ไม่ตัดขอบ */
+            border-radius: 15px; 
+            border: 3px solid rgba(255,255,255,0.8); 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            margin-bottom: 15px;
+            background: rgba(0,0,0,0.3); /* ใส่พื้นหลังเผื่อรูปไม่เต็มกรอบ */
+        }
+
+        .my-text {
+            font-family: 'Prompt', sans-serif; font-size: 16px; color: white; margin: 0; 
+            text-align: center; font-weight: 400; text-shadow: 0 0 10px var(--secondary);
+            line-height: 1.5;
+        }
+
+        /* เลเยอร์ฝ้ากระจก */
+        #wipeCanvas { 
+            position: absolute; top: 0; left: 0; z-index: 2; cursor: pointer; touch-action: none; 
+            transition: opacity 1.5s ease-out; /* แอนิเมชันสำหรับตอนฝ้ากระจกค่อยๆ เฟดหายไป */
+        }
+
+        /* --- 5. สล็อต --- */
+        .slot-machine { background: rgba(255,255,255,0.05); padding: 30px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); text-align: center; backdrop-filter: blur(10px); }
+        .slots { display: flex; gap: 15px; margin: 30px 0; justify-content: center; }
+        .slot { width: 60px; height: 80px; background: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 40px; box-shadow: inset 0 5px 10px rgba(0,0,0,0.2); overflow: hidden; position: relative; color: black; }
+        .slot-inner { transition: margin-top 2s cubic-bezier(0.1, 0.7, 0.1, 1); }
+
+        /* --- 6. โปสต์การ์ด --- */
+        .postcard { background: #fdfbf7; color: #222; width: 300px; padding: 40px 30px; border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); position: relative; }
+        .postcard-header { font-family: 'Cinzel', serif; font-size: 20px; text-align: center; border-bottom: 1px solid #ddd; padding-bottom: 15px; margin-bottom: 25px; letter-spacing: 3px; color: #011a33; }
+        .postcard p { font-size: 14px; line-height: 1.8; margin-bottom: 15px; font-weight: 300; }
+        .stamp { position: absolute; top: 20px; right: 20px; width: 40px; height: 50px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #aaa; }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div id="screen-keypad" class="screen active">
+        <div class="ticket-wrapper" id="ticket-wrapper">
+            <div class="ticket-half ticket-left">
+                <h1 class="museum-title">MUSEUM</h1>
+                <div class="subtitle">A Q U A R I U M &nbsp; T I C K E T</div>
+                <div class="dots" id="dots">
+                    <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+                </div>
+                <div class="keypad">
+                    <button class="key" onclick="pressKey('1')">1</button>
+                    <button class="key" onclick="pressKey('2')">2</button>
+                    <button class="key" onclick="pressKey('3')">3</button>
+                    <button class="key" onclick="pressKey('4')">4</button>
+                    <button class="key" onclick="pressKey('5')">5</button>
+                    <button class="key" onclick="pressKey('6')">6</button>
+                    <button class="key" onclick="pressKey('7')">7</button>
+                    <button class="key" onclick="pressKey('8')">8</button>
+                    <button class="key" onclick="pressKey('9')">9</button>
+                    <button class="key" style="font-size: 14px;" onclick="clearKey()">CLR</button>
+                    <button class="key" onclick="pressKey('0')">0</button>
+                    <button class="key" style="font-size: 16px; background: #00f2fe; color: black; border-color: #00f2fe;" onclick="checkPass()">></button>
+                </div>
+            </div>
+            <div class="ticket-half ticket-right">
+                <div class="ticket-no">Nº 1125</div>
+                <div class="barcode">|||| || |||</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-door" class="screen">
+        <p style="font-family: 'Cinzel'; letter-spacing: 3px; color: var(--secondary); margin-bottom: 40px; text-shadow: 0 0 15px var(--secondary);">AQUARIUM OF US</p>
+        <div class="door-container" onclick="openDoor()">
+            <div class="door-text" id="doorText">TAP TO ENTER<br><span style="font-size:12px; font-family:'Prompt'; font-weight:300;">( แตะเพื่อเปิดประตู )</span></div>
+            <div class="arch-door" id="arch-door">
+                <div class="door-left"></div>
+                <div class="door-right"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-giant-tank" class="screen">
+        <div id="tank-container"></div>
+        <div class="love-text-wrapper" id="loveTextWrap">
+            <div class="love-text-main">รักอ้วนนะ 💙</div>
+            <div class="love-text-sub">My Favorite Person</div>
+        </div>
+        <div class="tank-overlay">
+            <button class="btn-action" onclick="nextScreen('screen-wipe')">NEXT ROOM ➡️</button>
+        </div>
+    </div>
+
+    <div id="screen-wipe" class="screen">
+        <p style="font-family: 'Cinzel'; letter-spacing: 2px; color: var(--primary); margin-bottom: 20px;">FROSTY GLASS</p>
+        <p style="font-size: 14px; margin-bottom: 30px; font-weight: 300; color: #ccc;">ใช้นิ้วถูเพื่อเช็ดฝ้ากระจกสิ ❄️</p>
+        
+        <div class="wipe-wrapper">
+            
+            <div class="wipe-content" id="wipeContent">
+                <img src="love.JPG" alt="Our Photo" class="my-photo">
+                
+                <p class="my-text">น่ารักมั้ยยยยย<br>รักอ้วนที่สุดในโล๊กกก ขอจุ๊บที😚</p>
+            </div>
+
+            <canvas id="wipeCanvas" width="280" height="380"></canvas>
+        </div>
+        
+        <button class="btn-action" id="btnWipeDone" style="margin-top: 30px; opacity: 0; pointer-events: none; transition: 0.5s;" onclick="nextScreen('screen-slot')">เดินต่อไป ➡️</button>
+    </div>
+
+    <div id="screen-slot" class="screen">
+        <div class="slot-machine">
+            <h2 style="font-family: 'Cinzel'; margin: 0 0 10px 0; color: var(--primary);">LOVE MATCH</h2>
+            <p style="font-size: 13px; font-weight: 300; margin: 0;">กดสปินเพื่อเสี่ยงทายความรักของเรา</p>
+            <div class="slots">
+                <div class="slot" id="slot1"><div class="slot-inner">🤍</div></div>
+                <div class="slot" id="slot2"><div class="slot-inner">🤍</div></div>
+                <div class="slot" id="slot3"><div class="slot-inner">🤍</div></div>
+            </div>
+            <button class="btn-action" id="spinBtn" onclick="spinSlots()">SPIN !</button>
+        </div>
+    </div>
+
+    <div id="screen-postcard" class="screen">
+        <div class="postcard">
+            <div class="stamp">🪼</div>
+            <div class="postcard-header">MUSEUM OF US</div>
+            <p style="font-weight: 600;">To: อ้วน 💙</p>
+            <p>ทุกๆอย่างในอควาเรียมนี้ พี่ตั้งใจสร้างขึ้นมาเป็นของขวัญให้อ้วนโดยเฉพาะเลยนะ หวังว่าจะชอบน้า 🪼</p>
+            <p>ขอบคุณที่เข้ามาทำให้ทุกวันของพี่มีความหมาย ขอให้อยู่เป็นความสุขของกันและกันแบบนี้ไปนานๆนะครับ</p>
+            <p style="text-align: right; margin-top: 40px; font-style: italic; font-weight: 600;">
+                Love U SoBad💗<br>JubMuah🤓
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. ระบบพื้นหลัง ---
+        const canvasBg = document.getElementById('bg-canvas');
+        const ctxBg = canvasBg.getContext('2d');
+        let particles = [];
+        
+        function resizeCanvas() { canvasBg.width = window.innerWidth; canvasBg.height = window.innerHeight; }
+        window.addEventListener('resize', resizeCanvas); resizeCanvas();
+
+        for (let i = 0; i < 40; i++) {
+            particles.push({ x: Math.random() * canvasBg.width, y: Math.random() * canvasBg.height, r: Math.random() * 2 + 0.5, speed: Math.random() * 1 + 0.5, alpha: Math.random() * 0.5 + 0.1 });
+        }
+        function drawBg() {
+            ctxBg.clearRect(0, 0, canvasBg.width, canvasBg.height);
+            particles.forEach(p => {
+                ctxBg.beginPath(); ctxBg.arc(p.x, p.y, p.r, 0, Math.PI*2);
+                ctxBg.fillStyle = `rgba(79, 172, 254, ${p.alpha})`; ctxBg.fill();
+                p.y -= p.speed;
+                if (p.y < 0) { p.y = canvasBg.height; p.x = Math.random() * canvasBg.width; }
+            });
+            requestAnimationFrame(drawBg);
+        }
+        drawBg();
+
+        // --- ระบบเปลี่ยนหน้าจอ ---
+        function nextScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => {
+                if(s.classList.contains('active')) {
+                    s.style.animation = "fadeOut 0.5s ease forwards";
+                    setTimeout(() => { s.classList.remove('active'); s.style.animation = ""; }, 500);
+                }
+            });
+            setTimeout(() => { document.getElementById(id).classList.add('active'); }, 500);
+        }
+
+        // --- 2. ระบบ Keypad และตั๋ว ---
+        let pass = "";
+        function pressKey(num) {
+            if(pass.length < 4) { pass += num; updateDots(); }
+            if(pass.length === 4) setTimeout(checkPass, 300);
+        }
+        function clearKey() { pass = ""; updateDots(); }
+        function updateDots() {
+            document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('filled', i < pass.length));
+        }
+        function checkPass() {
+            if(pass === "1125") { 
+                document.getElementById('ticket-wrapper').classList.add('torn');
+                setTimeout(() => { nextScreen('screen-door'); }, 1200);
+            } else { 
+                alert("รหัสผิดจ้า (รหัสคือ 1125 น้า)"); clearKey(); 
+            }
+        }
+
+        // --- 3. ระบบประตูและตู้ปลา ---
+        function openDoor() {
+            document.getElementById('arch-door').classList.add('door-open');
+            document.getElementById('doorText').style.opacity = '0';
+            setTimeout(() => {
+                nextScreen('screen-giant-tank');
+                spawnJellyfish();
+                setTimeout(() => { document.getElementById('loveTextWrap').style.opacity = '1'; }, 1500);
+            }, 2500);
+        }
+
+        function spawnJellyfish() {
+            const tank = document.getElementById('tank-container');
+            tank.innerHTML = ''; 
+            const colors = ['#00f2fe', '#ff7eb3', '#f6d365', '#a18cd1'];
+            for(let i = 0; i < 40; i++) {
+                let jelly = document.createElement('div');
+                jelly.className = 'jellyfish-swarm';
+                jelly.innerText = '🪼';
+                jelly.style.left = (Math.random() * 90) + 'vw';
+                jelly.style.fontSize = (Math.random() * 50 + 40) + 'px'; 
+                jelly.style.animationDuration = (Math.random() * 12 + 8) + 's'; 
+                jelly.style.animationDelay = (Math.random() * 5) + 's'; 
+                let randomColor = colors[Math.floor(Math.random() * colors.length)];
+                jelly.style.filter = `drop-shadow(0 0 20px ${randomColor})`;
+                tank.appendChild(jelly);
+            }
+        }
+
+        // --- 4. ระบบเกมเช็ดกระจกฝ้า ---
+        const wipeCanvas = document.getElementById('wipeCanvas');
+        const wipeCtx = wipeCanvas.getContext('2d');
+        let isWiping = false;
+        let wipeProgress = 0; 
+        let isFrostCleared = false; 
+
+        function initFrost() {
+            wipeCtx.globalCompositeOperation = 'source-over';
+            // ฝ้ากระจกทึบ 98% เห็นภาพด้านหลังลางๆ
+            wipeCtx.fillStyle = 'rgba(230, 245, 255, 0.98)'; 
+            wipeCtx.fillRect(0, 0, wipeCanvas.width, wipeCanvas.height);
+        }
+        initFrost();
+
+        function getPos(e) {
+            let rect = wipeCanvas.getBoundingClientRect();
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        function startWipe(e) { 
+            if(isFrostCleared) return;
+            isWiping = true; 
+            eraseFrost(e); 
+        }
+        function endWipe() { isWiping = false; wipeCtx.beginPath(); }
+        
+        function eraseFrost(e) {
+            if (!isWiping || isFrostCleared) return;
+            e.preventDefault(); 
+            let pos = getPos(e);
+            
+            wipeCtx.globalCompositeOperation = 'destination-out'; 
+            wipeCtx.lineWidth = 55; 
+            wipeCtx.lineCap = 'round';
+            wipeCtx.lineJoin = 'round';
+            
+            wipeCtx.lineTo(pos.x, pos.y);
+            wipeCtx.stroke();
+            wipeCtx.beginPath();
+            wipeCtx.moveTo(pos.x, pos.y);
+
+            // เช็คจำนวนการถู
+            wipeProgress++;
+            
+            // ปรับการถูให้เมื่อถึงประมาณ 50% ให้กระจกฝ้าสลายตัวไปเลย
+            if (wipeProgress > 50) { 
+                autoClearFrost();
+            }
+        }
+
+        function autoClearFrost() {
+            isFrostCleared = true; 
+            wipeCanvas.style.opacity = '0'; // เฟด Canvas ให้โปร่งใส 
+            
+            setTimeout(() => {
+                wipeCanvas.style.display = 'none'; // เอา Canvas ออกไปเลย
+                let btn = document.getElementById('btnWipeDone');
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto'; // ให้กดปุ่มไปหน้าต่อไปได้
+            }, 1000);
+        }
+
+        wipeCanvas.addEventListener('mousedown', startWipe);
+        wipeCanvas.addEventListener('mouseup', endWipe);
+        wipeCanvas.addEventListener('mousemove', eraseFrost);
+        wipeCanvas.addEventListener('touchstart', startWipe, {passive: false});
+        wipeCanvas.addEventListener('touchend', endWipe);
+        wipeCanvas.addEventListener('touchmove', eraseFrost, {passive: false});
+
+        // --- 5. ระบบสล็อต ---
+        const emojis = ['🪼', '🌊', '🐟', '💙'];
+        function spinSlots() {
+            const btn = document.getElementById('spinBtn');
+            btn.disabled = true; btn.innerText = "SPINNING...";
+            let slots = [document.getElementById('slot1'), document.getElementById('slot2'), document.getElementById('slot3')];
+            let times = [15, 20, 25];
+            slots.forEach((slot, idx) => {
+                let inner = slot.querySelector('.slot-inner');
+                let count = 0;
+                let interval = setInterval(() => {
+                    inner.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+                    count++;
+                    if(count > times[idx]) {
+                        clearInterval(interval);
+                        inner.innerText = '🪼';
+                        if(idx === 2) {
+                            setTimeout(() => {
+                                btn.innerText = "JACKPOT! 💌";
+                                btn.style.background = "#ff4757"; btn.style.color = "white";
+                                btn.onclick = () => nextScreen('screen-postcard');
+                                btn.disabled = false;
+                            }, 500);
+                        }
+                    }
+                }, 100);
+            });
+        }
+    </script>
+</body>
+</html>
